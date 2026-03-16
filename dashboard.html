@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard – LOL Performance Tracker</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-trendline@2.1.0/src/chartjs-plugin-trendline.min.js"></script>
+
+    <style>
+        :root {
+            --bg:           #080710;
+            --bg-panel:     #0e0c1a;
+            --bg-card:      #13111f;
+            --bg-card-2:    #1a1728;
+            --border:       #231e38;
+            --border-lit:   #3a3060;
+            --lilac:        #b28dff;
+            --lilac-dim:    #7a5cc0;
+            --lilac-glow:   rgba(178,141,255,0.12);
+            --win:          #4ade80;
+            --win-bg:       rgba(74,222,128,0.08);
+            --loss:         #f87171;
+            --loss-bg:      rgba(248,113,113,0.08);
+            --text:         #ede9fc;
+            --text-muted:   #6b6385;
+            --text-mid:     #a099bc;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'DM Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ─── NOISE OVERLAY ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+            pointer-events: none;
+            z-index: 0;
+            opacity: .4;
+        }
+
+        /* ═══════════════════════════════
+           CHARTS PANEL (full width top)
+        ═══════════════════════════════ */
+        .charts-panel {
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            padding: 24px 36px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .charts-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .charts-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .charts-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .charts-notice {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            display: none;
+            padding: 8px 0;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 14px;
+        }
+
+        .chart-placeholder {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 18px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: border-color .25s, box-shadow .25s;
+        }
+
+        .chart-placeholder:hover {
+            border-color: var(--border-lit);
+            box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        .chart-header-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .chart-avg {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-left: auto;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .chart-avg-label {
+            font-size: 0.58rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            display: block;
+            text-align: right;
+            margin-top: -4px;
+            margin-bottom: 2px;
+        }
+
+        .chart-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .chart-sublabel {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+        }
+
+        .chart-canvas-wrap {
+            position: relative;
+            height: 130px;
+            width: 100%;
+            margin-top: 4px;
+        }
+
+        .chart-canvas-wrap canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* ═══════════════════════════════
+           MAIN CONTENT
+        ═══════════════════════════════ */
+        .main {
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 28px 36px;
+            gap: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ─── BACK BUTTON ─── */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.72rem;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            transition: color .2s;
+            align-self: flex-start;
+        }
+        .back-btn:hover { color: var(--lilac); }
+        .back-btn i { font-size: 0.8rem; }
+
+        /* ─── PROFILE CARD ─── */
+        .profile-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px 28px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            position: relative;
+            overflow: hidden;
+            animation: fadeUp .5s ease both;
+        }
+
+        .profile-card::before {
+            content: '';
+            position: absolute;
+            top: -60px; right: -60px;
+            width: 200px; height: 200px;
+            background: radial-gradient(circle, var(--lilac-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .profile-icon-wrap {
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .profile-icon {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            border: 2px solid var(--lilac-dim);
+            object-fit: cover;
+            background: var(--bg-card-2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            overflow: hidden;
+        }
+
+        .profile-icon img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+
+        .profile-level {
+            position: absolute;
+            bottom: -4px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--lilac-dim);
+            color: #fff;
+            font-family: 'Syne', sans-serif;
+            font-size: 0.62rem;
+            font-weight: 700;
+            padding: 1px 7px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        .profile-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .profile-name {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: 1.5px;
+        }
+
+        .profile-tag {
+            color: var(--lilac-dim);
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+
+        .profile-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .profile-region {
+            font-size: 0.68rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            background: var(--bg-card-2);
+            border: 1px solid var(--border);
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+
+        .profile-rank {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .rank-emblem {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .rank-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rank-tier {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--lilac);
+        }
+
+        .rank-lp {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+
+        .profile-winrate {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            margin-left: auto;
+            gap: 4px;
+        }
+
+        .wr-number {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: var(--win);
+            line-height: 1;
+        }
+
+        .wr-label {
+            font-size: 0.62rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .wr-record {
+            font-size: 0.68rem;
+            color: var(--text-mid);
+        }
+
+        /* ─── SECTION HEADER ─── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ─── MATCH HISTORY ─── */
+        .history-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .day-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            animation: fadeUp .5s ease both;
+        }
+
+        .day-group:nth-child(1) { animation-delay: .05s; }
+        .day-group:nth-child(2) { animation-delay: .10s; }
+        .day-group:nth-child(3) { animation-delay: .15s; }
+        .day-group:nth-child(4) { animation-delay: .20s; }
+
+        .day-label {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            padding-left: 2px;
+        }
+
+        /* ─── MATCH ROW ─── */
+        .match-row {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            display: grid;
+            grid-template-columns: 4px 56px 1fr;
+            align-items: center;
+            overflow: hidden;
+            transition: border-color .2s, transform .15s;
+            cursor: default;
+        }
+
+        .match-row:hover {
+            border-color: var(--border-lit);
+            transform: translateX(3px);
+        }
+
+        .match-row.win  { border-left-color: var(--win); background: linear-gradient(90deg, var(--win-bg) 0%, var(--bg-card) 120px); }
+        .match-row.loss { border-left-color: var(--loss); background: linear-gradient(90deg, var(--loss-bg) 0%, var(--bg-card) 120px); }
+
+        .match-stripe { width: 4px; align-self: stretch; }
+        .match-row.win  .match-stripe { background: var(--win); }
+        .match-row.loss .match-stripe { background: var(--loss); }
+
+        .match-champ {
+            width: 56px;
+            height: 56px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .match-champ img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .match-champ-placeholder {
+            width: 56px;
+            height: 56px;
+            background: var(--bg-card-2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+
+        .match-body {
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 0;
+            flex-wrap: nowrap;
+            overflow: hidden;
+        }
+
+        /* outcome pill */
+        .match-outcome {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            width: 40px;
+            flex-shrink: 0;
+        }
+        .match-row.win  .match-outcome { color: var(--win); }
+        .match-row.loss .match-outcome { color: var(--loss); }
+
+        .match-champ-name {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text);
+            width: 110px;
+            flex-shrink: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* stats grid */
+        .match-stats {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            flex: 1;
+            flex-wrap: nowrap;
+        }
+
+        .stat-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0 14px;
+            border-right: 1px solid var(--border);
+            flex: 1;
+            min-width: 0;
+        }
+        .stat-cell:last-child { border-right: none; }
+
+        .stat-val {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text);
+            white-space: nowrap;
+        }
+
+        .stat-key {
+            font-size: 0.58rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-top: 2px;
+            white-space: nowrap;
+        }
+
+        .kda-val {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 0.82rem;
+        }
+
+        .kda-good  { color: var(--win); }
+        .kda-avg   { color: var(--lilac); }
+        .kda-poor  { color: var(--loss); }
+
+        /* ─── FILTER BAR ─── */
+        .filter-bar {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            animation: fadeUp .5s ease both;
+            animation-delay: .05s;
+        }
+
+        .filter-bar label {
+            font-size: 0.62rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-input {
+            background: var(--bg-card-2);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            padding: 7px 12px;
+            outline: none;
+            transition: border-color .2s;
+            /* Forzamos el color del calendario/picker */
+            color-scheme: dark;
+        }
+
+        .filter-input:focus { border-color: var(--lilac-dim); }
+
+        .filter-select {
+            background: var(--bg-card-2);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.75rem;
+            padding: 7px 12px;
+            outline: none;
+            cursor: pointer;
+            transition: border-color .2s;
+        }
+
+        .filter-select:focus { border-color: var(--lilac-dim); }
+        .filter-select option { background: var(--bg-card); }
+
+        .filter-divider {
+            width: 1px;
+            height: 28px;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+
+        .filter-btn {
+            background: var(--lilac-dim);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            font-family: 'Syne', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            padding: 8px 18px;
+            cursor: pointer;
+            transition: background .2s, transform .15s;
+            white-space: nowrap;
+        }
+
+        .filter-btn:hover {
+            background: var(--lilac);
+            transform: translateY(-1px);
+        }
+
+        .filter-btn:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .role-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.68rem;
+            padding: 5px 10px;
+            cursor: pointer;
+            transition: all .2s;
+            white-space: nowrap;
+        }
+
+        .role-btn:hover {
+            color: var(--text);
+            border-color: var(--border-lit);
+        }
+
+        .role-btn.active {
+            background: var(--lilac-dim);
+            color: #fff;
+            border-color: var(--lilac-dim);
+        }
+
+        .filter-btn-ghost {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            font-family: 'DM Mono', monospace;
+            font-size: 0.7rem;
+            padding: 7px 14px;
+            cursor: pointer;
+            transition: color .2s, border-color .2s;
+            white-space: nowrap;
+        }
+
+        .filter-btn-ghost:hover {
+            color: var(--lilac);
+            border-color: var(--lilac-dim);
+        }
+
+        .filter-tag {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            margin-left: auto;
+        }
+
+        /* ─── LOADING STATE ─── */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            z-index: 100;
+        }
+
+        .loading-screen.hidden { display: none; }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 2px solid var(--border);
+            border-top-color: var(--lilac);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .loading-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 0.7rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        /* ─── ERROR STATE ─── */
+        .error-msg {
+            background: rgba(248,113,113,0.08);
+            border: 1px solid rgba(248,113,113,0.3);
+            border-radius: 10px;
+            padding: 20px 24px;
+            color: var(--loss);
+            font-size: 0.78rem;
+            display: none;
+        }
+
+        /* ─── EMPTY STATE ─── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            letter-spacing: 1px;
+            display: none;
+        }
+
+        .empty-state i {
+            font-size: 2.5rem;
+            display: block;
+            margin-bottom: 16px;
+            opacity: .3;
+        }
+
+        .cs-poor   { color: var(--loss); }
+        .cs-good   { color: var(--win); }
+        .cs-elite  { color: #fbbf24; }  /* dorado */
+
+        /* ─── SCROLLBAR ─── */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 10px; }
+
+        /* ─── RESPONSIVE ─── */
+        @media (max-width: 1100px) {
+            .charts-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 700px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .charts-panel { padding: 20px 16px; }
+            .main { padding: 20px 16px; }
+            .match-champ-name { width: 80px; }
+            .stat-cell { padding: 0 8px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ══════════════ LOADING ══════════════ -->
+<div class="loading-screen" id="loadingScreen">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Fetching data</p>
+</div>
+
+<!-- ══════════════ CHARTS PANEL ══════════════ -->
+<section class="charts-panel" id="chartsPanel" style="display:none">
+    <div class="charts-header">
+        <span class="charts-title">Performance Charts</span>
+        <div class="charts-line"></div>
+        <span class="charts-title" id="chartsWindowLabel">Moving avg · 10 games</span>
+    </div>
+
+    <p class="charts-notice" id="chartsNotice">Load at least 10 games to see charts</p>
+
+    <div class="charts-grid">
+        <div class="chart-placeholder">
+            <div class="chart-header-row">
+                <div>
+                    <p class="chart-label" style="color:#a78bfa">XP Diff @15</p>
+                    <p class="chart-sublabel">vs lane opponent</p>
+                </div>
+                <div>
+                    <span class="chart-avg" id="avgXPDiff">—</span>
+                    <span class="chart-avg-label">avg</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chartXPDiff"></canvas></div>
+        </div>
+
+        <div class="chart-placeholder">
+            <div class="chart-header-row">
+                <div>
+                    <p class="chart-label" style="color:#4ade80">CS / Min</p>
+                    <p class="chart-sublabel">creep score</p>
+                </div>
+                <div>
+                    <span class="chart-avg" id="avgCS">—</span>
+                    <span class="chart-avg-label">avg</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chartCS"></canvas></div>
+        </div>
+
+        <div class="chart-placeholder">
+            <div class="chart-header-row">
+                <div>
+                    <p class="chart-label" style="color:#f87171">Dmg / Min</p>
+                    <p class="chart-sublabel">damage output</p>
+                </div>
+                <div>
+                    <span class="chart-avg" id="avgDmg">—</span>
+                    <span class="chart-avg-label">avg</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chartDmg"></canvas></div>
+        </div>
+
+        <div class="chart-placeholder">
+            <div class="chart-header-row">
+                <div>
+                    <p class="chart-label" style="color:#fbbf24">Gold / Min</p>
+                    <p class="chart-sublabel">economy</p>
+                </div>
+                <div>
+                    <span class="chart-avg" id="avgGold">—</span>
+                    <span class="chart-avg-label">avg</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chartGold"></canvas></div>
+        </div>
+
+        <div class="chart-placeholder">
+            <div class="chart-header-row">
+                <div>
+                    <p class="chart-label" style="color:#38bdf8">Kill Part.</p>
+                    <p class="chart-sublabel">team presence %</p>
+                </div>
+                <div>
+                    <span class="chart-avg" id="avgKP">—</span>
+                    <span class="chart-avg-label">avg</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chartKP"></canvas></div>
+        </div>
+
+        <div class="chart-placeholder">
+            <div class="chart-header-row">
+                <div>
+                    <p class="chart-label" style="color:#fb923c">Dmg Share</p>
+                    <p class="chart-sublabel">% of team dmg</p>
+                </div>
+                <div>
+                    <span class="chart-avg" id="avgDmgShare">—</span>
+                    <span class="chart-avg-label">avg</span>
+                </div>
+            </div>
+            <div class="chart-canvas-wrap"><canvas id="chartDmgShare"></canvas></div>
+        </div>
+    </div>
+</section>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main class="main" id="mainContent" style="opacity:0">
+
+    <a class="back-btn" href="index.html">
+        <i class="fa-solid fa-arrow-left"></i> Back to search
+    </a>
+
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+        <!-- Preset rápidos -->
+        <label>Quick</label>
+        <div class="filter-group">
+            <button class="filter-btn-ghost" onclick="applyPreset(20)">Last 20</button>
+            <button class="filter-btn-ghost" onclick="applyPreset(50)">Last 50</button>
+            <button class="filter-btn-ghost" onclick="applyPreset(100)">Last 100</button>
+        </div>
+
+        <div class="filter-divider"></div>
+
+        <!-- Rango de fechas -->
+        <label>From</label>
+        <input type="date" class="filter-input" id="filterStart" />
+        <label>To</label>
+        <input type="date" class="filter-input" id="filterEnd" />
+
+        <div class="filter-divider"></div>
+
+        <!-- Rol -->
+        <label>Role</label>
+        <div class="filter-group" id="roleGroup">
+            <button class="role-btn active" data-role="ALL"     onclick="setRole(this)">All</button>
+            <button class="role-btn" data-role="TOP"            onclick="setRole(this)">Top</button>
+            <button class="role-btn" data-role="JUNGLE"         onclick="setRole(this)">Jungle</button>
+            <button class="role-btn" data-role="MIDDLE"         onclick="setRole(this)">Mid</button>
+            <button class="role-btn" data-role="BOTTOM"         onclick="setRole(this)">Bot</button>
+            <button class="role-btn" data-role="UTILITY"        onclick="setRole(this)">Support</button>
+        </div>
+
+        <div class="filter-divider"></div>
+        <label>Max</label>
+        <select class="filter-select" id="filterLimit">
+            <option value="20" selected>20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+        </select>
+
+        <button class="filter-btn" id="applyBtn" onclick="applyFilters()">
+            <i class="fa-solid fa-rotate"></i> Apply
+        </button>
+
+        <span class="filter-tag" id="filterTag">Showing last 20 games</span>
+    </div>
+
+    <!-- PROFILE CARD -->
+    <div class="profile-card" id="profileCard">
+        <div class="profile-icon-wrap">
+            <div class="profile-icon" id="profileIcon">
+                <i class="fa-solid fa-user" style="color:var(--text-muted)"></i>
+            </div>
+            <span class="profile-level" id="profileLevel">—</span>
+        </div>
+
+        <div class="profile-info">
+            <div class="profile-name">
+                <span id="profileName">—</span><span class="profile-tag" id="profileTagDisplay"></span>
+            </div>
+            <div class="profile-meta">
+                <span class="profile-region" id="profileRegion">—</span>
+                <div class="profile-rank">
+                    <div class="rank-emblem" id="rankEmblem">
+                        <img id="rankIcon" src="" alt="" style="width:100%;height:100%;object-fit:contain;display:none">
+                        <i class="fa-solid fa-shield" id="rankShield"></i>
+                    </div>
+                    <div class="rank-text">
+                        <span class="rank-tier" id="rankTier">Unranked</span>
+                        <span class="rank-lp" id="rankLP"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-winrate">
+            <span class="wr-number" id="profileWR">—%</span>
+            <span class="wr-label">Winrate</span>
+            <span class="wr-record" id="profileRecord">—W / —L</span>
+        </div>
+    </div>
+
+    <!-- ERROR -->
+    <div class="error-msg" id="errorMsg"></div>
+
+    <!-- SECTION TITLE -->
+    <div class="section-header">
+        <span class="section-title">Match History</span>
+        <div class="section-line"></div>
+        <span class="section-title" id="matchCount" style="flex-shrink:0">— games</span>
+    </div>
+
+    <!-- EMPTY -->
+    <div class="empty-state" id="emptyState">
+        <i class="fa-regular fa-folder-open"></i>
+        No matches found in this date range.
+    </div>
+
+    <!-- HISTORY -->
+    <div class="history-wrap" id="historyWrap"></div>
+
+</main>
+
+<script>
+/*
+  Dashboard JS: gestiona filtros, consumo de API, renderizado de perfil/matchhistory y gráficos.
+  No modifica la lógica de negocio, solo añade comentarios descriptivos.
+*/
+// ─── Parámetros URL ───────────────────────────────────────────
+const params   = new URLSearchParams(window.location.search);
+const SERVER   = params.get('server') || 'euw1,europe';
+const NAME     = params.get('name')   || '';
+const TAG      = params.get('tag')    || '';
+const [platform, routing] = SERVER.split(',');
+
+const API_BASE    = 'http://localhost:8000/api/v1';
+const DDRAGON_VER_URL = 'https://ddragon.leagueoflegends.com/api/versions.json';
+
+// Se rellena dinámicamente antes del primer render
+let DDRAGON_VERSION = '14.9.1'; // fallback por si falla la petición
+
+// Actualiza la versión del CDN de Data Dragon para íconos de campeones y perfiles.
+async function fetchDDragonVersion() {
+    try {
+        const res  = await fetch(DDRAGON_VER_URL);
+        const vers = await res.json();
+        DDRAGON_VERSION = vers[0]; // siempre la más reciente
+    } catch (_) {
+        // Dejamos el fallback silenciosamente en caso de error de red
+    }
+}
+
+// ─── Estado de filtros ────────────────────────────────────────
+let currentFilters = {
+    fechaInicio: null,
+    fechaFin:    null,
+    limit:       20,
+    rol:         'ALL',
+};
+
+// ─── Utilidades ───────────────────────────────────────────────
+// Convierte Date a string YYYY-MM-DD para inputs date.
+const fmt    = d => d.toISOString().split('T')[0];
+const today  = new Date();
+
+// Convierte timestamp Unix (ms) a formato legible de fecha.
+function formatDate(ts) {
+    const d = new Date(ts);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+// URL dinámica del ícono del campeón según Data Dragon.
+function champIconUrl(name) {
+    return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/champion/${name}.png`;
+}
+
+// URL dinámica del ícono de perfil según Data Dragon.
+function profileIconUrl(iconId) {
+    return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/profileicon/${iconId}.png`;
+}
+
+// Clasificación CSS para CS/min (estilo visual).
+function csClass(csMin) {
+    if (csMin >= 10)  return 'cs-elite';
+    if (csMin >= 8.5) return 'cs-good';
+    return 'cs-poor';
+}
+
+// Clasificación CSS para KDA (bueno/medio/malo).
+function kdaClass(kda) {
+    if (kda >= 4) return 'kda-good';
+    if (kda >= 2) return 'kda-avg';
+    return 'kda-poor';
+}
+
+// Calcula el ratio KDA con protección contra división por 0.
+function calcKDA(k, d, a) {
+    if (d === 0) return 'Perfect';
+    return ((k + a) / d).toFixed(2);
+}
+
+// ─── Filtros ──────────────────────────────────────────────────
+// Inicializa los campos de fecha con el rango por defecto (últimos 30 días).
+function initFilterDates() {
+    const endInput   = document.getElementById('filterEnd');
+    const startInput = document.getElementById('filterStart');
+    endInput.value   = fmt(today);
+    const past30     = new Date(today); past30.setDate(today.getDate() - 30);
+    startInput.value = fmt(past30);
+}
+
+// Cambia el rol seleccionado al hacer clic sobre los botones de rol.
+function setRole(btn) {
+    document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilters.rol = btn.dataset.role;
+    updateFilterTag();
+    reload();
+}
+
+// Aplica presets rápidos de límite (20/50/100 partidas) y reinicia fecha.
+function applyPreset(n) {
+    document.getElementById('filterStart').value = '';
+    document.getElementById('filterEnd').value   = '';
+    document.getElementById('filterLimit').value = n;
+    currentFilters = { ...currentFilters, fechaInicio: null, fechaFin: null, limit: n };
+    updateFilterTag();
+    reload();
+}
+
+// Aplica los filtros de fecha y límite, con comprobación de rango válido.
+function applyFilters() {
+    const start = document.getElementById('filterStart').value;
+    const end   = document.getElementById('filterEnd').value;
+    const limit = parseInt(document.getElementById('filterLimit').value);
+
+    if (start && end && start > end) {
+        alert('La fecha de inicio no puede ser posterior a la fecha fin.');
+        return;
+    }
+
+    currentFilters = {
+        ...currentFilters,
+        fechaInicio: start || null,
+        fechaFin:    end   || null,
+        limit,
+    };
+
+    updateFilterTag();
+    reload();
+}
+
+// Actualiza el texto de estado de filtros mostrados en la UI.
+function updateFilterTag() {
+    const tag = document.getElementById('filterTag');
+    const { fechaInicio, fechaFin, limit, rol } = currentFilters;
+    const rolLabel = rol === 'ALL' ? 'All roles' : rol.charAt(0) + rol.slice(1).toLowerCase();
+
+    if (fechaInicio && fechaFin) {
+        tag.textContent = `${fechaInicio} → ${fechaFin} · max ${limit} · ${rolLabel}`;
+    } else if (fechaInicio) {
+        tag.textContent = `From ${fechaInicio} · max ${limit} · ${rolLabel}`;
+    } else {
+        tag.textContent = `Last ${limit} games · ${rolLabel}`;
+    }
+}
+
+// ─── Render ───────────────────────────────────────────────────
+// Actualiza la sección de perfil con datos de jugador obtenidos del backend.
+function renderProfile(playerInfo, gameName, tagLine, wins, losses) {
+    document.getElementById('profileName').textContent       = gameName;
+    document.getElementById('profileTagDisplay').textContent = ' #' + tagLine;
+    document.getElementById('profileRegion').textContent     = platform.toUpperCase();
+    document.getElementById('profileLevel').textContent      =
+        playerInfo.summonerLevel !== '--' ? `Lv ${playerInfo.summonerLevel}` : 'Lv —';
+
+    document.getElementById('rankTier').textContent = playerInfo.rank || 'Unranked';
+
+    // Rank icon desde DDragon
+    const tierRaw    = (playerInfo.rank || '').split(' ')[0].toLowerCase();
+    const validTiers = ['iron','bronze','silver','gold','platinum','emerald','diamond','master','grandmaster','challenger'];
+    const rankImg    = document.getElementById('rankIcon');
+    const rankShield = document.getElementById('rankShield');
+
+    if (tierRaw && validTiers.includes(tierRaw)) {
+        rankImg.src              = `https://ddragon.leagueoflegends.com/cdn/img/ranked-emblems/${tierRaw}.png`;
+        rankImg.alt              = tierRaw;
+        rankImg.style.display    = 'block';
+        rankShield.style.display = 'none';
+    } else {
+        rankImg.style.display    = 'none';
+        rankShield.style.display = 'block';
+    }
+
+    // Profile icon
+    if (playerInfo.profileIconId && playerInfo.profileIconId !== 0) {
+        const iconEl = document.getElementById('profileIcon');
+        iconEl.innerHTML = `<img src="${profileIconUrl(playerInfo.profileIconId)}" alt="icon"
+            onerror="this.parentElement.innerHTML='<i class=\\'fa-solid fa-user\\' style=\\'color:var(--text-muted)\\'></i>'">`;
+    }
+
+    // Winrate
+    const total = wins + losses;
+    if (total > 0) {
+        const wr   = ((wins / total) * 100).toFixed(1);
+        const wrEl = document.getElementById('profileWR');
+        wrEl.textContent  = wr + '%';
+        wrEl.style.color  = wr >= 50 ? 'var(--win)' : 'var(--loss)';
+        document.getElementById('profileRecord').textContent = `${wins}W / ${losses}L`;
+    } else {
+        document.getElementById('profileWR').textContent     = '—%';
+        document.getElementById('profileRecord').textContent = '0W / 0L';
+    }
+}
+
+// Agrupa las partidas por día (fecha legible) para renderizar secciones cronológicas.
+function groupByDay(matches) {
+    const groups = {};
+    const sorted = [...matches].sort((a, b) => (b.creation_time || 0) - (a.creation_time || 0));
+    for (const m of sorted) {
+        const dateKey = m.creation_time ? formatDate(m.creation_time) : 'Unknown date';
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(m);
+    }
+    return groups;
+}
+
+// Genera el nodo HTML de una fila de partida en el historial.
+function buildMatchRow(m) {
+    const isWin     = m.win;
+    const kda       = calcKDA(m.kills, m.deaths, m.assists);
+    const kdaC      = kdaClass(parseFloat(kda));
+    const csMin     = m.cs_min ?? 0;
+    const csC       = csClass(csMin);
+    const champName = m.championName || 'Unknown';
+
+    const row       = document.createElement('div');
+    row.className   = `match-row ${isWin ? 'win' : 'loss'}`;
+
+    row.innerHTML = `
+        <div class="match-stripe"></div>
+        <div class="match-champ">
+            <img src="${champIconUrl(champName)}" alt="${champName}"
+                 onerror="this.outerHTML='<div class=\\'match-champ-placeholder\\'><i class=\\'fa-solid fa-dragon\\'></i></div>'">
+        </div>
+        <div class="match-body">
+            <span class="match-outcome">${isWin ? 'WIN' : 'LOSS'}</span>
+            <span class="match-champ-name" title="${champName}">${champName}</span>
+            <div class="match-stats">
+                <div class="stat-cell">
+                    <span class="stat-val">${m.kills}/${m.deaths}/${m.assists}</span>
+                    <span class="stat-key">KDA</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-val kda-val ${kdaC}">${kda}</span>
+                    <span class="stat-key">Ratio</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-val ${csC}">${csMin.toFixed(1)}</span>
+                    <span class="stat-key">CS/min</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-val">${Math.round(m.damage_min ?? 0).toLocaleString()}</span>
+                    <span class="stat-key">Dmg/min</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-val">${Math.round(m.gold_min ?? 0).toLocaleString()}</span>
+                    <span class="stat-key">Gold/min</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-val">${(m.damage_share ?? 0).toFixed(1)}%</span>
+                    <span class="stat-key">Dmg%</span>
+                </div>
+                <div class="stat-cell">
+                    <span class="stat-val">${(m.dmg_gold ?? 0).toFixed(2)}</span>
+                    <span class="stat-key">Dmg/gold</span>
+                </div>
+            </div>
+        </div>
+    `;
+    return row;
+}
+
+// Renderiza el historial de partidas agrupado por día y animado.
+function renderHistory(matches) {
+    const wrap = document.getElementById('historyWrap');
+    wrap.innerHTML = '';
+    document.getElementById('matchCount').textContent = `${matches.length} games`;
+
+    const emptyEl = document.getElementById('emptyState');
+
+    if (!matches.length) {
+        emptyEl.style.display = 'block';
+        return;
+    }
+    emptyEl.style.display = 'none';
+
+    const groups = groupByDay(matches);
+    let delay    = 0;
+
+    for (const [date, dayMatches] of Object.entries(groups)) {
+        const group       = document.createElement('div');
+        group.className   = 'day-group';
+        group.style.animationDelay = `${delay}s`;
+        delay += 0.05;
+
+        const label       = document.createElement('p');
+        label.className   = 'day-label';
+        label.textContent = date;
+        group.appendChild(label);
+
+        for (const m of dayMatches) {
+            group.appendChild(buildMatchRow(m));
+        }
+
+        wrap.appendChild(group);
+    }
+}
+
+// ─── Charts ───────────────────────────────────────────────────
+// Guarda instancias Chart.js para destruir previamente y evitar superposición.
+const chartInstances = {};
+
+function destroyChart(id) {
+    if (chartInstances[id]) {
+        chartInstances[id].destroy();
+        delete chartInstances[id];
+    }
+}
+
+// Crea un gráfico de línea con media móvil (Chart.js) para un campo específico.
+function makeChart(id, maData, field, color, unit = '', yMin = null, yMax = null) {
+    destroyChart(id);
+
+    const labels = maData.map((_, i) => `${i + 1}`);
+    const values = maData.map(p => parseFloat(p[field]));
+
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+
+    // Rango dinámico con padding del 10%
+    const min  = yMin  ?? Math.min(...values);
+    const max  = yMax  ?? Math.max(...values);
+    const pad  = (max - min) * 0.15 || 1;
+
+    chartInstances[id] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                data:            values,
+                borderColor:     color,
+                borderWidth:     1.5,
+                pointRadius:     0,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: color,
+                fill:            true,
+                backgroundColor: (ctx) => {
+                    const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, 130);
+                    gradient.addColorStop(0,   color + '33');
+                    gradient.addColorStop(1,   color + '00');
+                    return gradient;
+                },
+                tension: 0.4,
+                trendlineLinear: {
+                    colorMin:   color + '99',
+                    colorMax:   color + '99',
+                    lineStyle:  'dotted',
+                    width:      1.5,
+                    projection: false,
+                }
+            }]
+        },
+        options: {
+            responsive:          true,
+            maintainAspectRatio: false,
+            animation:           { duration: 600, easing: 'easeOutQuart' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1a1728',
+                    borderColor:     color,
+                    borderWidth:     1,
+                    titleColor:      '#6b6385',
+                    bodyColor:       '#ede9fc',
+                    titleFont:       { family: 'DM Mono', size: 10 },
+                    bodyFont:        { family: 'DM Mono', size: 11 },
+                    padding:         8,
+                    callbacks: {
+                        title: (items) => `Games ${items[0].label}–${parseInt(items[0].label) + 9}`,
+                        label: (item)  => ` ${item.formattedValue}${unit}`,
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    display:    true,
+                    grid:       { color: '#231e38', drawTicks: false },
+                    border:     { display: false },
+                    ticks: {
+                        color:       '#6b6385',
+                        font:        { family: 'DM Mono', size: 9 },
+                        maxTicksLimit: 6,
+                        maxRotation:  0,
+                    }
+                },
+                y: {
+                    display:    true,
+                    min:        Math.max(0, min - pad),
+                    max:        max + pad,
+                    grid:       { color: '#231e38', drawTicks: false },
+                    border:     { display: false },
+                    ticks: {
+                        color:       '#6b6385',
+                        font:        { family: 'DM Mono', size: 9 },
+                        maxTicksLimit: 4,
+                        callback: (v) => `${parseFloat(v.toFixed(1))}${unit}`,
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Calcula el promedio de una métrica en media móvil.
+function calcAvg(maData, field) {
+    if (!maData || maData.length === 0) return null;
+    return maData.reduce((sum, p) => sum + parseFloat(p[field]), 0) / maData.length;
+}
+
+// Actualiza el texto promedio en el panel de estadísticas.
+function setAvg(id, value, decimals = 1, unit = '') {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value !== null ? `${value.toFixed(decimals)}${unit}` : '—';
+}
+
+// Renderiza o oculta los gráficos según existencia de datos.
+function renderCharts(maData) {
+    const panel  = document.getElementById('chartsPanel');
+    const notice = document.getElementById('chartsNotice');
+    const grid   = document.querySelector('.charts-grid');
+
+    panel.style.display = 'block';
+
+    if (!maData || maData.length === 0) {
+        notice.style.display = 'block';
+        grid.style.display   = 'none';
+        ['chartXPDiff','chartCS','chartDmg','chartGold','chartKP','chartDmgShare']
+            .forEach(destroyChart);
+        ['avgXPDiff','avgCS','avgDmg','avgGold','avgKP','avgDmgShare']
+            .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
+        return;
+    }
+
+    notice.style.display = 'none';
+    grid.style.display   = 'grid';
+
+    // Calculamos y mostramos AVGs
+    setAvg('avgXPDiff',   calcAvg(maData, 'avg_xp_diff_15'), 0, '');
+    setAvg('avgCS',       calcAvg(maData, 'avg_cs_min'),     2, '');
+    setAvg('avgDmg',      calcAvg(maData, 'avg_dmg_min'),    0, '');
+    setAvg('avgGold',     calcAvg(maData, 'avg_gold_min'),   0, '');
+    setAvg('avgKP',       calcAvg(maData, 'avg_kp'),         1, '%');
+    setAvg('avgDmgShare', calcAvg(maData, 'avg_dmg_share'),  1, '%');
+
+    // Pintamos las gráficas
+    makeChart('chartXPDiff',   maData, 'avg_xp_diff_15', '#a78bfa', '');
+    makeChart('chartCS',       maData, 'avg_cs_min',     '#4ade80', '');
+    makeChart('chartDmg',      maData, 'avg_dmg_min',    '#f87171', '');
+    makeChart('chartGold',     maData, 'avg_gold_min',   '#fbbf24', '');
+    makeChart('chartKP',       maData, 'avg_kp',         '#38bdf8', '%', 0, 100);
+    makeChart('chartDmgShare', maData, 'avg_dmg_share',  '#fb923c', '%', 0, 100);
+}
+
+// Muestra/oculta indicador de carga y deshabilita boton Apply.
+function setLoading(on) {
+    const btn    = document.getElementById('applyBtn');
+    const screen = document.getElementById('loadingScreen');
+    btn.disabled = on;
+    btn.innerHTML = on
+        ? '<i class="fa-solid fa-spinner fa-spin"></i> Loading…'
+        : '<i class="fa-solid fa-rotate"></i> Apply';
+    // Solo mostramos la pantalla de carga en la primera carga
+    if (on && document.getElementById('mainContent').style.opacity === '0') {
+        screen.classList.remove('hidden');
+    }
+}
+
+// ─── Fetch ────────────────────────────────────────────────────
+// Construye URL con filtros y obtiene datos del endpoint backend.
+async function fetchData() {
+    const { fechaInicio, fechaFin, limit, rol } = currentFilters;
+
+    let url = `${API_BASE}/player/stats`
+        + `?game_name=${encodeURIComponent(NAME)}`
+        + `&tag_line=${encodeURIComponent(TAG)}`
+        + `&rol=${rol}`
+        + `&ventana_movil=10`
+        + `&routing=${routing}`
+        + `&platform=${platform}`
+        + `&limit=${limit}`;
+
+    if (fechaInicio) url += `&fecha_inicio=${fechaInicio}`;
+    if (fechaFin)    url += `&fecha_fin=${fechaFin}`;
+
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+    return data;
+}
+
+// ─── Refresca toda la UI: carga datos, renderiza perfil, historia y gráficos.
+async function reload() {
+    setLoading(true);
+    const errEl = document.getElementById('errorMsg');
+    errEl.style.display = 'none';
+
+    try {
+        const data   = await fetchData();
+        const wins   = data.match_history.filter(m => m.win).length;
+        const losses = data.match_history.filter(m => !m.win).length;
+
+        renderProfile(data.player_info, NAME, TAG, wins, losses);
+        renderHistory(data.match_history);
+        renderCharts(data.moving_averages);
+    } catch (err) {
+        errEl.textContent    = `⚠ ${err.message}`;
+        errEl.style.display  = 'block';
+    } finally {
+        setLoading(false);
+        const main = document.getElementById('mainContent');
+        document.getElementById('loadingScreen').classList.add('hidden');
+        main.style.transition = 'opacity .4s ease';
+        main.style.opacity    = '1';
+    }
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+// Validación simple: si falta nombre o tag redirigimos al buscador.
+if (!NAME || !TAG) {
+    window.location.href = 'index.html';
+} else {
+    initFilterDates();
+    // Cargamos versión DDragon antes de ir a fetch principal.
+    fetchDDragonVersion().then(() => reload());
+}
+</script>
+
+</body>
+</html>

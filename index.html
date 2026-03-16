@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YGG</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!--
+        Estilos principales del index:
+        - variables de color
+        - layout centrado
+        - estilos de barra de búsqueda y botón
+    -->
+    <style>
+        /* === PALETA DE COLORES (Variables para facilitar cambios) === */
+        :root {
+            --bg-dark: #0a0812;
+            --bg-card: #151120;
+            --primary-lilac: #b28dff;
+            --primary-lilac-hover: #9665f5;
+            --text-main: #f0ecfc;
+            --text-muted: #78708c;
+            --border-color: #2b2342;
+        }
+
+        /* === RESET Y FONDO === */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark); 
+            background-image: radial-gradient(circle at center, #1b152b 0%, var(--bg-dark) 100%);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-main);
+            position: relative; /* Necesario para posicionar la marca de agua */
+        }
+
+        h1 {
+            margin-bottom: 40px;
+            font-size: 2.8rem;
+            font-weight: 300; /* Letra más fina y elegante */
+            letter-spacing: 3px;
+            color: var(--text-main);
+            text-shadow: 0 0 15px rgba(178, 141, 255, 0.2);
+        }
+
+        /* === LA BARRA DE BÚSQUEDA === */
+        .search-wrapper {
+            display: flex;
+            align-items: center;
+            background-color: var(--bg-card);
+            border-radius: 50px;
+            padding: 6px 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 650px;
+            transition: all 0.3s ease;
+        }
+
+        /* Efecto al hacer clic dentro del buscador */
+        .search-wrapper:focus-within {
+            border-color: var(--primary-lilac);
+            box-shadow: 0 10px 40px rgba(178, 141, 255, 0.15);
+        }
+
+        select {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            outline: none;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 12px 15px;
+            cursor: pointer;
+            border-right: 1px solid var(--border-color);
+            transition: color 0.3s ease;
+        }
+        
+        select:hover, select:focus { color: var(--text-main); }
+        select option { background-color: var(--bg-card); color: var(--text-main); }
+
+        input[type="text"] {
+            background: transparent;
+            color: var(--text-main);
+            border: none;
+            outline: none;
+            font-size: 1.1rem;
+            font-weight: 300;
+            padding: 12px 15px;
+        }
+        
+        input::placeholder { color: var(--text-muted); }
+
+        .input-name { flex-grow: 1; min-width: 150px; }
+        .input-tag { width: 90px; }
+
+        .hash-separator {
+            color: var(--border-color);
+            font-size: 1.2rem;
+            font-weight: 300;
+            user-select: none;
+        }
+
+        /* BOTÓN DE BUSCAR */
+        .search-btn {
+            background-color: var(--primary-lilac);
+            color: var(--bg-dark);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background-color: var(--primary-lilac-hover);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(178, 141, 255, 0.4);
+        }
+
+        /* === FOOTER / WATERMARK === */
+        .watermark {
+            position: absolute;
+            bottom: 30px;
+            left: 40px; /* Lo mantenemos en la esquina inferior izquierda */
+            display: flex;
+            flex-direction: column;
+            align-items: center; /* Centra los iconos justo debajo del texto */
+            
+            gap: 12px;
+        }
+
+        .watermark p {
+            font-size: 0.9rem;
+            font-weight: 300;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .social-icons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .social-icons a {
+            color: var(--text-muted);
+            font-size: 1.3rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        /* Colores de las redes sociales al pasar el ratón */
+        .social-icons a:hover {
+            color: var(--primary-lilac);
+            transform: translateY(-3px);
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Título de la aplicación y componente de búsqueda principal -->
+    <h1>LOL Performance Tracker</h1>
+
+    <div class="search-wrapper">
+        <select id="server-select">
+            <option value="euw1,europe" selected>EUW</option>
+            <option value="na1,americas">NA</option>
+            <option value="la1,americas">LAN</option>
+            <option value="la2,americas">LAS</option>
+            <option value="kr,asia">KR</option>
+        </select>
+
+        <input type="text" id="game-name" class="input-name" placeholder="Summoner Name" autocomplete="off">
+        
+        <span class="hash-separator">#</span>
+        
+        <input type="text" id="tag-line" class="input-tag" placeholder="Tag" maxlength="5" autocomplete="off">
+
+        <button class="search-btn" onclick="startSearch()">
+            <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+    </div>
+
+    <div class="watermark">
+        <p>Made by Yoangi</p>
+        <div class="social-icons">
+            <a href="https://x.com/yoangichan" target="_blank" title="X (Twitter)"><i class="fa-brands fa-x-twitter"></i></a>
+            <a href="https://www.tiktok.com/@yoangi.dtk" target="_blank" title="TikTok"><i class="fa-brands fa-tiktok"></i></a>
+            <a href="https://www.instagram.com/yoangi.trashu" target="_blank" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+            <a href="https://github.com/yoangiDev" target="_blank" title="GitHub"><i class="fa-brands fa-github"></i></a>
+            <a href="https://www.twitch.tv/yoangi" target="_blank" title="Twitch"><i class="fa-brands fa-twitch"></i></a>
+            <a href="https://discord.com/invite/R4t2ckbdSn" target="_blank" title="Discord"><i class="fa-brands fa-discord"></i></a>
+        </div>
+    </div>
+
+    <script>
+        /*
+           JavaScript del buscador en index.html.
+           1) Obtiene valores del formulario.
+           2) Valida que no estén vacíos.
+           3) Redirige a dashboard.html con parámetros en la URL.
+        */
+        function startSearch() {
+            const serverValue = document.getElementById('server-select').value;
+            const gameName = document.getElementById('game-name').value.trim();
+            const tagLine = document.getElementById('tag-line').value.trim();
+
+            // Validación mínima: ambos campos obligatorios.
+            if (!gameName || !tagLine) {
+                alert("Please enter a summoner name and tag.");
+                return;
+            }
+
+            // Construye la URL de dashboard y redirige.
+            window.location.href = `dashboard.html?server=${serverValue}&name=${encodeURIComponent(gameName)}&tag=${encodeURIComponent(tagLine)}`;
+        }
+
+        // Permite disparar la búsqueda al pulsar Enter en los campos de texto.
+        document.getElementById('game-name').addEventListener('keydown', e => {
+            if (e.key === 'Enter') startSearch();
+        });
+        document.getElementById('tag-line').addEventListener('keydown', e => {
+            if (e.key === 'Enter') startSearch();
+        });
+    </script>
+
+</body>
+</html>
